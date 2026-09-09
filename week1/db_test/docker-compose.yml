@@ -1,0 +1,15 @@
+services:
+  # 우리가 만든 채팅 앱
+  app:
+    build: . # 현재 디렉터리의 Dockerfile로 빌드
+    ports:
+      - "8000:8000" # 호스트:컨테이너 — 브라우저에서 localhost:8000
+    depends_on:
+      - redis # redis를 먼저 띄움
+
+  redis:
+    image: redis:7 # 빌드 없이 이미지 그대로 사용
+    ports:
+      - "6379:6379"
+        # 호스트에서도 redis-cli로 붙어보려고 열어둠
+        # 앱만 쓸 거면 이 줄은 없어도 동작함
