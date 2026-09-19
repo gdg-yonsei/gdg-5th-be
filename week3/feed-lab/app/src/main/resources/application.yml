@@ -1,0 +1,41 @@
+server:
+  port: 8080
+  tomcat:
+    max-connections: 10000
+    accept-count: 1000
+
+spring:
+  application.name: feed-lab
+  threads.virtual.enabled: true          # 요청이 몰려도 Tomcat 스레드가 아니라 DB 커넥션 풀에서 줄을 서게 한다
+  main.banner-mode: "off"
+  task.scheduling.pool.size: 4
+  web.resources.static-locations: "${FEEDLAB_STATIC:classpath:/static/}"
+
+feedlab:
+  hybrid-threshold: ${HYBRID_THRESHOLD:10000}
+  fanout-batch-size: ${FANOUT_BATCH_SIZE:1}
+  worker-interval-ms: ${WORKER_INTERVAL_MS:1000}
+  loadgen-port: ${LOADGEN_PORT:8081}
+  metrics-interval-ms: ${METRICS_INTERVAL_MS:250}   # 큐 대기 수 같은 DB 조회 메트릭을 갱신하는 주기
+  datasource:
+    main:                                # 피드 조회 / 글 작성이 쓰는 풀
+      pool-name: main
+      jdbc-url: ${DB_URL:jdbc:postgresql://localhost:5435/feedlab}
+      username: ${DB_USER:postgres}
+      password: ${DB_PASSWORD:postgres}
+      maximum-pool-size: ${DB_POOL:20}
+      minimum-idle: ${DB_POOL:20}
+      connection-timeout: 3000           # 3초 기다려도 커넥션이 없으면 503
+    ops:                                 # 워커 / 메트릭 / 화면 보조 API 전용. 부하에 굶지 않게 분리
+      pool-name: ops
+      jdbc-url: ${DB_URL:jdbc:postgresql://localhost:5435/feedlab}
+      username: ${DB_USER:postgres}
+      password: ${DB_PASSWORD:postgres}
+      maximum-pool-size: 6
+      minimum-idle: 6
+      connection-timeout: 3000
+
+logging.level:
+  root: WARN
+  com.example.feedlab: INFO
+  org.springframework.boot.web.embedded: INFO

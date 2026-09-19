@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>feed-lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-version="v1">
+
+<header>
+  <div class="brand"><b>feed-lab</b><span>뉴스 피드 v1 → v4</span></div>
+
+  <nav class="versions" id="versions">
+    <button data-v="v1"><b>v1</b><span>읽을 때 모은다</span></button>
+    <button data-v="v2"><b>v2</b><span>쓸 때 뿌린다</span></button>
+    <button data-v="v3"><b>v3</b><span>나중에 뿌린다</span></button>
+    <button data-v="v4"><b>v4</b><span>셀럽만 따로</span></button>
+  </nav>
+
+  <div class="presets" id="presets">
+    <span class="label">부하</span>
+    <button data-preset="stop">정지</button>
+    <button data-preset="low">읽기 30</button>
+    <button data-preset="s1">읽기 300</button>
+    <button data-preset="heavy">헤비만 300</button>
+    <button data-preset="s2">읽기 3000</button>
+    <button data-preset="s3">읽기 300 + 쓰기 5</button>
+  </div>
+
+  <div class="tools">
+    <button id="btnBig" title="지표만 크게 보기 (단축키 M)">지표 크게</button>
+    <button id="btnCode" title="이 버전의 핵심 코드 (단축키 C)">코드</button>
+    <button id="btnReset" title="시드 이후에 쓴 글/feeds/잡 삭제">초기화</button>
+  </div>
+</header>
+
+<main id="main">
+  <!-- 왼쪽: 조작 -->
+  <section class="col left">
+    <div class="box">
+      <h3>현재 계정</h3>
+      <select id="account"></select>
+      <div class="row"><input id="customId" type="number" placeholder="다른 유저 id"><button id="btnCustom">전환</button></div>
+      <div class="meta" id="accountMeta">-</div>
+    </div>
+
+    <div class="box">
+      <h3>글 작성 <small id="writeAs"></small></h3>
+      <textarea id="content" rows="2" placeholder="무슨 일이 있었나요?"></textarea>
+      <button class="primary" id="btnWrite">작성</button>
+      <div class="meta" id="writeResult">-</div>
+    </div>
+
+    <div class="box" id="boxDemo">
+      <h3>시연 단축 버튼 <small>키: Q W E R</small></h3>
+      <div class="grid2">
+        <button id="btnCeleb" class="celeb" title="단축키 Q">C 셀럽 글 쓰기</button>
+        <button id="btnD" class="normal" title="단축키 W">D 글 쓰기</button>
+      </div>
+      <button id="btnBurst" class="celeb wide" title="단축키 E">셀럽 5명이 동시에 글 쓰기</button>
+      <button id="btnBurstD" class="hol wide" title="단축키 R">셀럽 5명 → 1초 뒤 D 글</button>
+    </div>
+
+    <div class="box">
+      <h3>팔로우</h3>
+      <div class="row"><input id="followTarget" type="number" placeholder="대상 유저 id">
+        <button id="btnFollow">팔로우</button><button id="btnUnfollow">언팔</button></div>
+      <div class="meta" id="followResult">-</div>
+    </div>
+
+    <div class="box">
+      <h3>설정 <small>질문 받았을 때 바로 바꿔 보기</small></h3>
+      <label class="inline"><span>팬아웃 묶음 크기</span>
+        <select id="batchSize"><option value="1">1 (팔로워마다 1회)</option><option value="10">10</option><option value="100">100</option><option value="1000">1,000</option></select></label>
+      <label class="inline"><span>v4 셀럽 기준 (팔로워)</span><input id="threshold" type="number" step="1000" min="1"></label>
+      <div class="meta" id="configMeta">-</div>
+    </div>
+
+    <div class="box">
+      <h3>부하 직접 조절</h3>
+      <label><span class="numrow">읽기 <input id="readRpsNum" type="number" min="0" max="500000" step="10" value="0"> rps</span><input id="readRps" type="range" min="0" max="5000" step="10" value="0"></label>
+      <select id="mix"><option value="uniform">읽는 사람: 균등 (라이트:미드:헤비 1:1:1)</option><option value="heavy_only">읽는 사람: 헤비만</option><option value="light_only">읽는 사람: 라이트만</option></select>
+      <label><span class="numrow">쓰기 <input id="writeRpsNum" type="number" min="0" max="5000" step="1" value="0"> rps</span><input id="writeRps" type="range" min="0" max="20" step="1" value="0"></label>
+      <button id="btnApply">적용 (Enter)</button>
+      <div class="meta">숫자는 직접 입력할 수 있다. 슬라이더 범위를 넘겨도 된다 (읽기 최대 50만).</div>
+    </div>
+  </section>
+
+  <!-- 가운데: 피드 두 개 (+ 코드 서랍) -->
+  <section class="col center">
+    <div class="feeds">
+      <div class="panel">
+        <div class="panel-head"><h2 id="myFeedTitle">내 피드</h2><span class="timing" id="myFeedTiming"></span><button id="btnRefresh">새로고침</button></div>
+        <ol class="feed" id="myFeed"></ol>
+      </div>
+      <div class="panel observer">
+        <div class="panel-head"><h2>관찰자 E의 피드</h2><span class="timing" id="obsTiming">자동 갱신</span></div>
+        <ol class="feed" id="obsFeed"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 코드 서랍: 왼쪽+가운데를 덮는다. 상황판은 계속 보인다 -->
+  <div class="code-drawer" id="codeDrawer" hidden>
+    <div class="code-head"><h2 id="codeTitle"></h2><div class="code-tabs" id="codeTabs"></div><button id="btnFontDown" title="글자 작게">A−</button><button id="btnFontUp" title="글자 크게">A+</button><button id="btnCodeClose">닫기</button></div>
+    <pre id="code"></pre>
+  </div>
+
+  <!-- 오른쪽: 상황판 -->
+  <section class="col right">
+    <div class="pool" id="pool"><span class="pool-label">DB 커넥션 풀</span><div class="pool-bar" id="poolBar"></div><span class="pool-text" id="poolText">-</span></div>
+
+    <div class="cards">
+      <div class="card" id="cardRead"><h4>피드 조회 p99 <small>loadgen 측정</small></h4>
+        <div class="big"><span id="readP99">-</span><em>ms</em></div><div class="sub" id="readSub">부하 없음</div><canvas class="spark"></canvas></div>
+      <div class="card" id="cardWrite"><h4>글 작성 응답 <small>최근 5초 중 최대</small></h4>
+        <div class="big"><span id="writeMax">-</span><em>ms</em></div><div class="sub" id="writeSub">-</div><canvas class="spark"></canvas></div>
+      <div class="card" id="cardProp"><h4>반영 지연 <small>작성 → 팔로워 피드</small></h4>
+        <div class="big"><span id="propVal">-</span><em id="propUnit">초</em></div><div class="sub" id="propSub">-</div><canvas class="spark"></canvas></div>
+      <div class="card" id="cardFeeds"><h4>feeds 테이블 <small>미리 만들어 둔 피드</small></h4>
+        <div class="big small"><span id="feedsRows">-</span><em>행</em></div><div class="sub" id="feedsSub">-</div><canvas class="spark"></canvas></div>
+    </div>
+
+    <div class="plots">
+      <div class="plot"><h4>읽기: <b>내가 팔로우한 수</b> → 지연</h4><div class="wrap"><canvas id="scatterRead"></canvas></div></div>
+      <div class="plot"><h4>쓰기: <b>나를 팔로우한 수</b> → 지연</h4><div class="wrap"><canvas id="scatterWrite"></canvas></div></div>
+    </div>
+
+    <table class="cohorts">
+      <thead><tr><th>읽는 사람</th><th>팔로우</th><th>p50</th><th>p99</th><th>성공 rps</th><th>에러</th></tr></thead>
+      <tbody id="cohortBody"></tbody>
+    </table>
+
+    <div class="ledger">
+      <h4>비용은 어디로 갔나 <small>시연하면서 자동 기록</small><button id="btnLedgerClear">지우기</button></h4>
+      <table><thead><tr><th></th><th>읽기 p99<br><small>균등 300rps</small></th><th>성공 rps<br><small>목표 300</small></th><th>셀럽 작성<br><small>응답</small></th><th>셀럽 글<br><small>도착</small></th><th>D 글 도착<br><small>셀럽 5명 뒤</small></th></tr></thead>
+      <tbody id="ledgerBody"></tbody></table>
+    </div>
+  </section>
+</main>
+
+<div id="toasts"></div>
+<div id="banner" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

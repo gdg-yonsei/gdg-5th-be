@@ -1,0 +1,83 @@
+# feed-lab: postgres + app + loadgen
+# 핵심 설정은 DB_CPUS 다. DB 를 CPU 2개로 묶어야 어떤 노트북에서도 v1 의 "처리량 천장"이 같은 자리에서 보인다.
+name: feed-lab
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: feedlab-postgres
+    environment:
+      POSTGRES_DB: feedlab
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-2GB}
+      - -c
+      - effective_cache_size=${PG_CACHE_SIZE:-4GB}
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - max_wal_size=8GB
+      - -c
+      - checkpoint_timeout=30min
+      - -c
+      - synchronous_commit=off          # 시연용 DB: 디스크 동기화 편차를 없앤다
+      - -c
+      - wal_level=minimal               # 시드 적재 시 WAL 생략
+      - -c
+      - max_wal_senders=0
+      - -c
+      - max_connections=100
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - jit=off
+      - -c
+      - shared_preload_libraries=pg_prewarm
+    cpus: ${DB_CPUS:-2}
+    shm_size: 1gb
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data          # named volume (bind mount 는 macOS 에서 느리다)
+      - ./seed:/seed:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d feedlab"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: { context: ., target: app }
+    container_name: feedlab-app
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/feedlab
+      DB_POOL: ${DB_POOL:-20}
+      HYBRID_THRESHOLD: ${HYBRID_THRESHOLD:-10000}
+      FANOUT_BATCH_SIZE: ${FANOUT_BATCH_SIZE:-1}
+      WORKER_INTERVAL_MS: ${WORKER_INTERVAL_MS:-1000}
+      FEEDLAB_STATIC: "file:/static/,classpath:/static/"
+    cpus: ${APP_CPUS:-4}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app/src/main/resources/static:/static:ro   # 화면(HTML/JS)은 다시 빌드하지 않고 새로고침만으로 반영
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  loadgen:
+    build: { context: ., target: loadgen }
+    container_name: feedlab-loadgen
+    environment:
+      TARGET_URL: http://app:8080
+    cpus: ${LOADGEN_CPUS:-6}
+    ports:
+      - "8081:8081"
+    depends_on: [app]
+
+volumes:
+  pgdata:

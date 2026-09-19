@@ -1,0 +1,36 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'org.jetbrains.kotlin.plugin.spring'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect'
+    implementation 'tools.jackson.module:jackson-module-kotlin'
+    runtimeOnly 'org.postgresql:postgresql'
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        freeCompilerArgs.addAll '-Xjsr305=strict'
+    }
+}
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// 화면의 "코드 보기"가 실제로 돌아가는 소스를 그대로 보여주도록, 버전별 파일을 정적 리소스로 복사한다.
+processResources {
+    from('src/main/kotlin/com/example/feedlab/versions') { into 'static/code' }
+    from('src/main/kotlin/com/example/feedlab/core/Fanout.kt') { into 'static/code' }
+}
+
+bootJar { archiveFileName = 'app.jar' }
+jar { enabled = false }

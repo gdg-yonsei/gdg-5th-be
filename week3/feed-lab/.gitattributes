@@ -1,0 +1,15 @@
+# Windows 에서 clone 해도 컨테이너 안에서 도는 파일은 LF 를 유지한다 (CRLF 면 gradlew 가 "bash\r" 를 찾다 실패한다)
+* text=auto
+gradlew      text eol=lf
+Makefile     text eol=lf
+Dockerfile   text eol=lf
+*.sql        text eol=lf
+*.py         text eol=lf
+*.sh         text eol=lf
+*.kt         text eol=lf
+*.yml        text eol=lf
+*.bat        text eol=crlf
+*.ps1        text eol=crlf
+*.jar        binary
+*.jpg        binary
+*.png        binary
