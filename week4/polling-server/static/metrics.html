@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polling Metrics</title>
+    <link rel="stylesheet" href="/polling/static/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="join-panel">
+        <h1>Polling Metrics</h1>
+        <p id="metrics-status" class="connection-status" aria-live="polite"></p>
+        <dl id="metrics-list"></dl>
+        <button id="refresh-button" type="button">Refresh</button>
+        <button id="reset-button" type="button">Reset metrics</button>
+      </section>
+    </main>
+    <script src="/polling/static/metrics.js"></script>
+  </body>
+</html>

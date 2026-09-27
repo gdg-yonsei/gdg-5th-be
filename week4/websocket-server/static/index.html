@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Game Demo</title>
+    <link rel="stylesheet" href="/websocket/static/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="join-panel" aria-labelledby="join-heading">
+        <h1 id="join-heading">Enter your name</h1>
+        <form id="join-form">
+          <label class="sr-only" for="player-name">Player name</label>
+          <input id="player-name" name="player-name" maxlength="30" required />
+          <button type="submit">Join Game</button>
+        </form>
+      </section>
+
+      <section id="game-panel" class="game-panel hidden" aria-label="Game area">
+        <div id="player-count" class="game-header">Players: 0</div>
+        <div id="game-area" class="game-area"></div>
+        <p class="controls">Controls: WASD / Arrow Keys</p>
+      </section>
+      <p id="connection-status" class="connection-status" aria-live="polite"></p>
+    </main>
+    <script src="/websocket/static/game.js"></script>
+</body>
+</html>
