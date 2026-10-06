@@ -1,0 +1,33 @@
+{
+ "N": 1000000,
+ "build_uni_s": 2.2,
+ "build_tri_s": 4.0,
+ "like_substr": {
+  "ms": 194.13,
+  "hits": 50141
+ },
+ "like_prefix": {
+  "ms": 90.64,
+  "hits": 35883
+ },
+ "fts_unicode61": {
+  "ms": 0.33,
+  "hits": 7194
+ },
+ "fts_prefix": {
+  "ms": 2.81,
+  "hits": 35883
+ },
+ "fts_trigram_3": {
+  "ms": 0.29,
+  "hits": 7088
+ },
+ "fts_trigram_2": {
+  "ms": 0.0,
+  "hits": 0
+ },
+ "like_3": {
+  "ms": 184.36,
+  "hits": 7088
+ }
+}

@@ -1,0 +1,35 @@
+[
+ {
+  "n": 10000,
+  "build_ms": 11,
+  "scan_substr_ms": 0.52,
+  "scan_token_ms": 3.27,
+  "index_lookup_ms": 0.0001,
+  "and_ms": 0.148,
+  "substr_hits": 556,
+  "exact_token_hits": 82,
+  "terms": 62
+ },
+ {
+  "n": 100000,
+  "build_ms": 128,
+  "scan_substr_ms": 6.1,
+  "scan_token_ms": 36.37,
+  "index_lookup_ms": 0.0002,
+  "and_ms": 2.081,
+  "substr_hits": 4994,
+  "exact_token_hits": 764,
+  "terms": 62
+ },
+ {
+  "n": 1000000,
+  "build_ms": 1056,
+  "scan_substr_ms": 62.95,
+  "scan_token_ms": 356.35,
+  "index_lookup_ms": 0.0002,
+  "and_ms": 22.877,
+  "substr_hits": 50141,
+  "exact_token_hits": 7194,
+  "terms": 62
+ }
+]
