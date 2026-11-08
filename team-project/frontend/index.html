@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f8f8f5"><title>GDGoC AI · Team AI</title>
+  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div id="backdrop" class="backdrop" hidden></div>
+  <aside id="sidebar" aria-label="대화 목록">
+    <a class="brand" href="/" aria-label="GDGoC AI 홈"><span class="brand-icon">✳</span> GDGoC AI</a>
+    <button id="new-chat" class="new-chat"><span>＋</span> 새로운 대화 <kbd>⌘ K</kbd></button>
+    <div class="section-label">내 대화 <span id="chat-count">0</span></div>
+    <nav id="history" aria-label="저장된 대화"></nav>
+    <div class="sidebar-bottom"><div class="project-badge"><span class="status-dot"></span> Team project <span>v0.1</span></div><p>작은 서비스가 모여, 하나의 AI로.</p><div class="profile"><span class="avatar">나</span><div>나의 워크스페이스<small>이 브라우저에 대화 저장</small></div></div></div>
+  </aside>
+  <main>
+    <header><div class="header-left"><button id="menu" class="icon-button mobile-only" aria-label="대화 목록 열기" aria-expanded="false">☰</button><span>GDGoC AI <span class="header-sub">/ Assistant</span></span></div><span class="mode"><span class="status-dot"></span> Mock 모드</span></header>
+    <div id="scroll-area">
+      <section id="welcome" class="welcome"><div class="hero-icon">✳</div><div class="eyebrow">YOUR IDEAS, CONNECTED</div><h1>무엇이든, 함께 풀어봐요.</h1><p>궁금한 것부터 떠오른 아이디어까지.<br>당신의 다음 생각을 GDGoC AI와 시작해 보세요.</p>
+        <div class="suggestions"><button data-prompt="AI 에이전트가 무엇인지 쉽게 설명해 줘"><span>✧</span><strong>새로운 개념 알아보기</strong><small>AI 에이전트는 어떻게 작동할까?</small><b>↗</b></button><button data-prompt="팀 프로젝트를 시작할 때 할 일을 정리해 줘"><span>▤</span><strong>생각을 계획으로 바꾸기</strong><small>팀 프로젝트의 첫 단계 정리하기</small><b>↗</b></button><button data-prompt="마이크로서비스 아이디어를 함께 브레인스토밍해 줘"><span>⌘</span><strong>아이디어 함께 넓히기</strong><small>작은 서비스로 만들 수 있는 것들</small><b>↗</b></button></div>
+        <div class="welcome-note"><span class="status-dot"></span> 지금은 연습 중이에요. 모든 질문에 “안녕하세요”로 답해요.</div>
+      </section>
+      <section id="messages" class="messages" aria-label="대화 내용" hidden></section>
+    </div>
+    <div class="composer-wrap"><div id="error" class="error" role="alert" hidden></div><button id="jump-bottom" hidden>↓ 최신 메시지</button><form id="composer"><label class="sr-only" for="prompt">메시지</label><textarea id="prompt" rows="1" maxlength="16000" placeholder="GDGoC AI에게 메시지 보내기" required></textarea><div class="composer-bottom"><span><span class="spark">✳</span> Team Assistant <span class="composer-hint">· 함께 생각하는 AI</span></span><button id="send" type="submit" aria-label="메시지 보내기" disabled>↑</button><button id="stop" type="button" aria-label="응답 중지" hidden>■</button></div></form><p class="disclaimer">Enter로 전송 · Shift + Enter로 줄바꿈 <span>GDGoC AI의 답변은 틀릴 수 있어요. 중요한 정보는 확인해 주세요.</span></p></div>
+  </main>
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>

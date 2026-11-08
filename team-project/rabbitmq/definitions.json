@@ -1,0 +1,37 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "memory",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "memory.add.requested.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "memory",
+      "vhost": "/",
+      "destination": "memory.add.requested.v1",
+      "destination_type": "queue",
+      "routing_key": "memory.add.requested",
+      "arguments": {}
+    }
+  ]
+}

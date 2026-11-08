@@ -1,0 +1,6 @@
+fastapi==0.115.11
+uvicorn==0.34.0
+grpcio==1.70.0
+grpcio-tools==1.70.0
+protobuf==5.29.3
+aio-pika==9.5.5

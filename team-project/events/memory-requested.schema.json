@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MemoryRequestedEvent v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "type",
+    "eventId",
+    "occurredAt",
+    "conversationId",
+    "userMessage",
+    "assistantMessage"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "type": {
+      "const": "memory.add.requested"
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "conversationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "userMessage": {
+      "type": "string"
+    },
+    "assistantMessage": {
+      "type": "string"
+    }
+  }
+}

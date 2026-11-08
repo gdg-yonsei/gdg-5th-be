@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: chat-backend
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:gdgoc}
+    password: ${RABBITMQ_PASSWORD:gdgoc-dev-password}
+  threads:
+    virtual:
+      enabled: true
+server:
+  port: 8080
+management:
+  health:
+    rabbit:
+      enabled: false # TODO (팀원 4): 래빗엠큐 연동을 구현한 후 상태 검사를 활성화하세요.
+  endpoints:
+    web:
+      exposure:
+        include: health
+app:
+  memory:
+    exchange: memory
+    queue: memory.add.requested.v1
+    routing-key: memory.add.requested

@@ -13,6 +13,15 @@ class CourseRepository:
             row = cur.fetchone()
             return Course(**row) if row else None
 
+    def find_by_id_for_update(self, conn, course_id: int) -> Course | None:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, name, left_seats FROM course WHERE id = %s FOR UPDATE",
+                (course_id,),
+            )
+            row = cur.fetchone()
+            return Course(**row) if row else None
+
     def save(self, conn, course: Course) -> None:
         with conn.cursor() as cur:
             cur.execute(

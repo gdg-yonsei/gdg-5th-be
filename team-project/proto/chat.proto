@@ -1,0 +1,35 @@
+syntax = "proto3";
+package chatbot.v1;
+option java_package = "com.example.chat.proto";
+option java_multiple_files = true;
+option go_package = "example.com/team/llm-gateway/gen;chatpb";
+
+// Browser -> Spring uses HTTP/SSE; these contracts are for future internal gRPC integration.
+// The starter services currently return independent mock responses.
+service LlmGateway {
+  rpc Generate(ChatRequest) returns (stream ChatChunk);
+}
+service RagService {
+  rpc Retrieve(RetrieveRequest) returns (RetrieveResponse);
+  rpc StoreMemory(StoreMemoryRequest) returns (StoreMemoryResponse);
+}
+message ChatMessage { string role = 1; string content = 2; }
+message ChatRequest {
+  string conversation_id = 1;
+  repeated ChatMessage messages = 2;
+}
+message ChatChunk {
+  string delta = 1;
+  bool done = 2;
+}
+message RetrieveRequest { string conversation_id = 1; string query = 2; }
+message ContextChunk { string id = 1; string content = 2; double score = 3; }
+// Mock retrieval returns one fixed sample memory chunk.
+message RetrieveResponse { repeated ContextChunk chunks = 1; }
+message StoreMemoryRequest {
+  string conversation_id = 1;
+  string user_message = 2;
+  string assistant_message = 3;
+}
+// 모의 구현에서는 저장하지 않고 거짓을 반환합니다. 실제 저장은 팀원 3이 구현하세요.
+message StoreMemoryResponse { bool stored = 1; }

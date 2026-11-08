@@ -1,0 +1,7 @@
+**/target/
+**/gen/
+**/__pycache__/
+**/.venv/
+.env
+rag-service/chat_pb2.py
+rag-service/chat_pb2_grpc.py

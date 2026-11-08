@@ -1,0 +1,104 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-gdgoc}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-gdgoc-dev-password}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  llm-gateway:
+    build:
+      context: .
+      dockerfile: llm-gateway/Dockerfile
+    ports:
+      - "${GATEWAY_PORT:-50051}:50051"
+    healthcheck:
+      test: ["CMD", "/gateway", "-healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rag-service:
+    build:
+      context: .
+      dockerfile: rag-service/Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-gdgoc}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-gdgoc-dev-password}
+    ports:
+      - "${RAG_HTTP_PORT:-8001}:8000"
+      - "${RAG_GRPC_PORT:-50052}:50052"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1.0-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-gdgoc}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-gdgoc-dev-password}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  rabbitmq-init:
+    image: curlimages/curl:8.12.1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-gdgoc}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-gdgoc-dev-password}
+    volumes:
+      - ./rabbitmq/definitions.json:/definitions.json:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        exec curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 2
+        --user "$$RABBITMQ_USERNAME:$$RABBITMQ_PASSWORD"
+        --header 'Content-Type: application/json'
+        --request POST http://rabbitmq:15672/api/definitions
+        --data-binary @/definitions.json
+    restart: "no"
+
+volumes:
+  rabbitmq-data:
