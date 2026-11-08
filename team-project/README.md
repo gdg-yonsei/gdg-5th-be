@@ -147,42 +147,43 @@ docker compose exec rabbitmq rabbitmqctl list_bindings
 
 `.env`의 `RABBITMQ_PORT`, `RABBITMQ_MANAGEMENT_PORT`로 외부 포트를 바꿀 수 있습니다. 큐 이름·exchange·routing key를 바꾸려면 `rabbitmq/definitions.json`과 Spring `application.yml`의 `app.memory` 설정을 함께 수정하세요. 브로커 데이터는 `rabbitmq-data` 볼륨에 유지됩니다. 메시지를 재시작 후에도 보존하려면 발행 시 persistent 메시지 설정도 구현하세요.
 
-## proto 생성과 로컬 개발
+## 서비스별 개발과 proto 생성
 
-생성 코드는 직접 수정하거나 커밋하지 않습니다. Docker 빌드 중 언어별로 `proto/chat.proto`에서 생성합니다.
+로컬에는 Docker와 Docker Compose만 있으면 됩니다. Java·Go·Python과 proto 생성 도구는 이미지 빌드 중 설치되며, `proto/chat.proto`의 언어별 코드도 자동 생성됩니다. 생성 코드는 직접 수정하거나 커밋하지 않습니다.
 
-- Java 21 / Maven: protobuf Maven plugin이 `target/generated-sources`로 생성합니다. 현재 Spring mock은 생성된 클라이언트를 사용하지 않습니다.
-- Go 1.23: `protoc-gen-go`와 `protoc-gen-go-grpc`가 `llm-gateway/gen`으로 생성합니다.
-- Python 3.12: `grpcio-tools`가 Python 모듈을 생성합니다. FastAPI lifespan에서 비동기 gRPC 서버도 시작합니다. Uvicorn은 **단일 worker**로 실행해야 gRPC 포트가 충돌하지 않습니다.
-
-호스트에서 개별 개발할 때의 예시입니다. Java/Go/Python과 언어별 빌드 도구가 필요합니다. 의존성 버전은 각 빌드 파일에 명시되어 있습니다.
+`team-project` 폴더에서 담당 서비스만 지정해 실행하세요.
 
 ```sh
-# Spring (독립 실행 가능)
-cd backend
-mvn spring-boot:run
+# 팀원 1: Spring
+docker compose up --build backend
 
-# Go (독립 실행 가능)
-cd llm-gateway
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
-export PATH="$(go env GOPATH)/bin:$PATH"
-mkdir -p gen
-protoc -I ../proto --go_out=gen --go_opt=paths=source_relative \
-  --go-grpc_out=gen --go-grpc_opt=paths=source_relative ../proto/chat.proto
-go mod tidy
-go run .
+# 팀원 2: Go 게이트웨이
+docker compose up --build llm-gateway
 
-# Python
-cd rag-service
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-python -m grpc_tools.protoc -I ../proto --python_out=. --grpc_python_out=. ../proto/chat.proto
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# 팀원 3: RAG
+docker compose up --build rag-service
+
+# 팀원 4: 메시지 브로커와 큐 초기화
+docker compose up -d rabbitmq rabbitmq-init
+
+# 팀원 4: 발행·수신 코드를 수정한 뒤 해당 서비스 재빌드
+docker compose up --build backend rag-service
+
+# 채팅 UI도 함께 확인 (Spring도 자동 실행)
+docker compose up --build frontend backend
 ```
 
-위 블록의 각 서비스 명령은 `team-project`를 기준으로 **서로 다른 터미널**에서 실행하세요. 프론트엔드는 Compose의 Nginx로 제공됩니다. 프론트만 정적 서버로 열 경우 `/api/` 프록시도 구성해야 합니다.
+현재 소스는 이미지에 복사되므로 파일을 수정해도 실행 중인 컨테이너에 자동 반영되지 않습니다. 수정 후 같은 `up --build` 명령을 다시 실행하세요. `up`만 실행하면 기존 이미지를 사용할 수 있고, `restart`는 이미지를 다시 빌드하지 않습니다.
+
+백그라운드 실행에는 `-d`를 붙이고, 로그는 `docker compose logs -f 서비스명`으로 확인합니다. Spring 컨테이너를 재생성한 뒤 이미 실행 중인 UI가 연결되지 않으면 `docker compose restart frontend`로 프록시 주소를 갱신하세요.
+
+proto를 수정하면 해당 계약을 사용하는 서비스들을 함께 재빌드합니다.
+
+```sh
+docker compose up -d --build backend llm-gateway rag-service
+```
+
+Python 서비스는 HTTP와 gRPC 서버를 함께 실행하므로 다중 작업자 실행을 추가할 때 gRPC 포트가 충돌하지 않도록 구성해야 합니다.
 
 참고: [gRPC Go 스트리밍](https://grpc.io/docs/languages/go/basics/), [gRPC Python 코드 생성](https://grpc.io/docs/languages/python/quickstart/), [Spring SSE](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html).
 
