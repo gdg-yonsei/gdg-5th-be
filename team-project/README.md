@@ -56,7 +56,7 @@ Spring과 RAG는 서로 직접 호출하지 않습니다. RabbitMQ 인프라는 
 | 팀원 3 | `rag-service/main.py` | `Retrieve` 검색, `StoreMemory` 및 `handle_memory()`의 메모리 분할·임베딩·저장, 대화별 메모리 격리 |
 | 팀원 4 | `MemoryEventPublisher.java`, `memory_consumer.py`, `rabbitmq/definitions.json` | RabbitMQ 설정, 응답 완료 후 비동기 이벤트 발행, 수신기 시작·종료, 수신 확인·재시도, 팀원 3의 저장 함수 연결 |
 | 공동 | `proto/chat.proto` | gRPC 통신 계약. 변경 전에 서로 합의하고 관련 서비스 재빌드 |
-| 팀원 4 | `events/memory-requested.schema.json` | 메모리 추가 이벤트 계약 관리. 팀원 1·3과 메시지 형식 합의 |
+| 팀원 4 | `MemoryRequestedEvent.java`, `memory_consumer.py` | Java와 Python 이벤트 자료형을 맞추고 팀원 1·3과 메시지 형식 합의 |
 
 UI에는 mock 모드가 표시됩니다. 실제 provider를 연결한 뒤 `frontend/index.html`의 mock 안내를 바꾸세요. 답변은 안전한 텍스트와 fenced code block으로 표시하며 임의 HTML을 실행하지 않습니다. 대화는 현재 브라우저에 저장됩니다. 전체 대화가 서버에 영구 보관되는 구조는 아닙니다. 한 요청은 최대 100개 메시지, 메시지당 16,000자이며 한도를 넘기면 새 대화를 시작합니다.
 
@@ -93,7 +93,7 @@ data: {"conversationId":"demo-1"}
 - exchange: `memory` (direct, durable)
 - queue: `memory.add.requested.v1` (durable)
 - routing key: `memory.add.requested`
-- 이벤트 본문: UTF-8 JSON. 계약은 `events/memory-requested.schema.json`입니다.
+- 이벤트 본문: UTF-8 JSON. `MemoryRequestedEvent.java`와 `memory_consumer.py`의 이벤트 자료형을 동일하게 유지하세요.
 
 `rabbitmq-init`이 `rabbitmq/definitions.json`을 Management HTTP API로 가져와 exchange·큐·binding을 생성합니다. Spring과 RAG의 발행·수신 코드는 TODO 상태이며, 브로커 없이도 기존 mock API를 사용할 수 있습니다. Spring의 RabbitMQ healthcheck도 구현 전에는 비활성화되어 있습니다.
 
