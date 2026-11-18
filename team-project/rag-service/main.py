@@ -19,11 +19,11 @@ SAMPLE_MEMORY = {
 
 class RagService(rpc.RagServiceServicer):
     async def Retrieve(self, request, context):
-        # TODO (팀원 3): 대화의 메모리 저장소를 검색하고 관련 문서 조각을 반환하세요.
+        # TODO (팀원 3): 데이터베이스에서 대화별 메모리와 관련 문서 조각을 조회하세요.
         return pb.RetrieveResponse(chunks=[pb.ContextChunk(**SAMPLE_MEMORY)])
 
     async def StoreMemory(self, request, context):
-        # TODO (팀원 3): 답변이 완료될 때마다 메모리를 분할하고 임베딩을 생성해 저장하세요.
+        # TODO (팀원 3): 답변이 완료되면 메모리를 분할하고 임베딩을 생성해 데이터베이스에 저장하세요.
         logger.info("Mock StoreMemory called (no persistence)")
         return pb.StoreMemoryResponse(stored=False)
 

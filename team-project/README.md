@@ -1,6 +1,6 @@
 # GDGoC AI · AI Agent Chatbot 팀 프로젝트
 
-각자 하나의 마이크로서비스를 확장해 하나의 AI agent chatbot을 만드는 실습용 보일러플레이트입니다. 프론트엔드는 완성된 상태로 제공하며, 답변 생성과 RAG API는 단순 mock입니다. 완성된 프론트엔드는 Spring mock에 연결되고, RabbitMQ 브로커와 큐, 이벤트 계약만 준비되어 있습니다. 이벤트 발행·수신은 팀원 4가, Go gateway 연결은 팀원 1·2가, 실제 메모리 저장은 팀원 3이 구현합니다.
+각자 하나의 마이크로서비스를 확장해 하나의 AI agent chatbot을 만드는 실습용 보일러플레이트입니다. 프론트엔드는 완성된 상태로 제공하며, 답변 생성과 RAG API는 단순 mock입니다. 완성된 프론트엔드는 Spring mock에 연결되고, RabbitMQ 브로커와 큐, 이벤트 계약만 준비되어 있습니다. 이벤트 발행·수신은 팀원 4가, Go gateway 연결은 팀원 1·2가, PostgreSQL을 이용한 실제 메모리 저장은 팀원 3이 구현합니다.
 
 ```mermaid
 flowchart LR
@@ -8,6 +8,7 @@ flowchart LR
     LLM[팀원 2 · Go :50051 · 독립 mock]
     API -.->|구현 과제: 응답 완료 후 비동기 발행| MQ[팀원 4 · RabbitMQ · memory.add.requested.v1]
     MQ -.->|구현 과제: 이벤트 수신| RAG[팀원 3 · FastAPI + gRPC · 저장 mock]
+    RAG -.->|팀원 3 구현 과제: 저장 및 검색| DB[PostgreSQL · 메모리 저장소]
     API -->|SSE delta / done / error| UI
 ```
 
@@ -28,6 +29,7 @@ docker compose ps
 - RAG API 문서: http://localhost:8001/docs
 - RAG 상태: http://localhost:8001/health
 - RabbitMQ 관리 UI: http://localhost:15672
+- PostgreSQL: `localhost:15432` (기본 데이터베이스 `chatbot`)
 
 처음에는 Java/Go/Python 의존성과 이미지를 다운로드하므로 시간이 걸립니다. RabbitMQ가 준비되면 `rabbitmq-init`이 exchange·큐·binding을 생성합니다. Spring과 RAG는 RabbitMQ에 대한 시작 의존성 없이 각각 실행됩니다. 프론트엔드는 Spring의 healthcheck를 기다립니다. Go gateway는 독립적으로 시작합니다. RAG의 외부 HTTP 포트는 다른 개발 서버와의 충돌을 줄이도록 8001이며 컨테이너 내부에서는 8000을 사용합니다. 호스트 포트를 바꿔도 컨테이너 내부 주소는 그대로입니다.
 
@@ -55,6 +57,7 @@ Spring과 RAG는 서로 직접 호출하지 않습니다. RabbitMQ 인프라는 
 | 팀원 2 | `llm-gateway/main.go` | provider 및 RAG 연결, 실제 답변 스트리밍, 컨텍스트 조합, tool 실행 루프 |
 | 팀원 3 | `rag-service/main.py` | `Retrieve` 검색, `StoreMemory` 및 `handle_memory()`의 메모리 분할·임베딩·저장, 대화별 메모리 격리 |
 | 팀원 4 | `MemoryEventPublisher.java`, `memory_consumer.py`, `rabbitmq/definitions.json` | RabbitMQ 설정, 응답 완료 후 비동기 이벤트 발행, 수신기 시작·종료, 수신 확인·재시도, 팀원 3의 저장 함수 연결 |
+| 팀원 3 | `postgres/init.sql` | PostgreSQL 테이블 설계, 이벤트 중복 처리, 메모리 저장·검색 |
 | 공동 | `proto/chat.proto` | gRPC 통신 계약. 변경 전에 서로 합의하고 관련 서비스 재빌드 |
 | 팀원 4 | `MemoryRequestedEvent.java`, `memory_consumer.py` | Java와 Python 이벤트 자료형을 맞추고 팀원 1·3과 메시지 형식 합의 |
 
@@ -147,6 +150,32 @@ docker compose exec rabbitmq rabbitmqctl list_bindings
 
 `.env`의 `RABBITMQ_PORT`, `RABBITMQ_MANAGEMENT_PORT`로 외부 포트를 바꿀 수 있습니다. 큐 이름·exchange·routing key를 바꾸려면 `rabbitmq/definitions.json`과 Spring `application.yml`의 `app.memory` 설정을 함께 수정하세요. 브로커 데이터는 `rabbitmq-data` 볼륨에 유지됩니다. 메시지를 재시작 후에도 보존하려면 발행 시 persistent 메시지 설정도 구현하세요.
 
+## PostgreSQL 메모리 저장소
+
+PostgreSQL 17과 초기 테이블을 제공합니다. 현재 RAG API는 샘플 응답을 유지하며 데이터베이스 연결·저장·조회는 팀원 3이 구현합니다. RAG는 데이터베이스가 없어도 mock으로 실행할 수 있습니다.
+
+- `memory_events`: 이벤트 식별자, 대화 식별자, 사용자 메시지와 답변, 발생·저장 시각.
+- `memory_chunks`: 이벤트별 문서 조각과 조각 순서. 이벤트 테이블을 통해 대화별로 조회합니다.
+- `event_id` 기본 키와 이벤트별 조각 순서 고유 제약을 제공합니다. 실제 중복 처리 및 트랜잭션 코드는 구현 과제입니다.
+- 임베딩 저장과 벡터 검색은 팀원 3이 추가로 설계합니다.
+
+```sh
+# 데이터베이스 실행
+docker compose up -d postgres
+
+# 데이터베이스 터미널 접속
+docker compose exec postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+# RAG 코드 수정 후 데이터베이스와 함께 실행
+docker compose up -d --build postgres rag-service
+```
+
+접속 기본값은 데이터베이스 `chatbot`, 계정 `gdgoc` / `gdgoc-dev-password`입니다. 호스트에서는 `localhost:15432`, 컨테이너에서는 `postgres:5432`를 사용합니다. 기본 외부 포트는 로컬 PostgreSQL과의 충돌을 줄이도록 15432입니다.
+
+`.env`의 `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`로 초기 접속 정보를 설정합니다. RAG에는 표준 연결 환경 변수 `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`와 Psycopg 의존성을 제공합니다. 실제 연결 수명 주기, 저장 및 조회 코드는 비워 두었습니다.
+
+`postgres/init.sql`은 빈 데이터 볼륨의 첫 실행에만 적용됩니다. 기존 볼륨에서 테이블을 변경할 때는 별도 변경 SQL을 적용하세요. 초기 계정과 비밀번호도 이미 초기화된 데이터베이스에서는 환경 변수 수정만으로 바뀌지 않습니다. 데이터는 `postgres-data` 볼륨에 유지되며 일반 `docker compose down`으로 지워지지 않습니다.
+
 ## 서비스별 개발과 proto 생성
 
 로컬에는 Docker와 Docker Compose만 있으면 됩니다. Java·Go·Python과 proto 생성 도구는 이미지 빌드 중 설치되며, `proto/chat.proto`의 언어별 코드도 자동 생성됩니다. 생성 코드는 직접 수정하거나 커밋하지 않습니다.
@@ -160,8 +189,8 @@ docker compose up --build backend
 # 팀원 2: Go 게이트웨이
 docker compose up --build llm-gateway
 
-# 팀원 3: RAG
-docker compose up --build rag-service
+# 팀원 3: 데이터베이스와 RAG
+docker compose up --build postgres rag-service
 
 # 팀원 4: 메시지 브로커와 큐 초기화
 docker compose up -d rabbitmq rabbitmq-init
@@ -188,3 +217,5 @@ Python 서비스는 HTTP와 gRPC 서버를 함께 실행하므로 다중 작업�
 참고: [gRPC Go 스트리밍](https://grpc.io/docs/languages/go/basics/), [gRPC Python 코드 생성](https://grpc.io/docs/languages/python/quickstart/), [Spring SSE](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html).
 
 RabbitMQ 참고: [Spring AMQP](https://docs.spring.io/spring-boot/reference/messaging/amqp.html), [RabbitMQ 작업 큐](https://www.rabbitmq.com/tutorials/tutorial-two-python), [aio-pika](https://docs.aio-pika.com/quick-start.html).
+
+PostgreSQL 참고: [공식 Docker 이미지](https://hub.docker.com/_/postgres), [Psycopg 설치](https://www.psycopg.org/psycopg3/docs/basic/install.html).

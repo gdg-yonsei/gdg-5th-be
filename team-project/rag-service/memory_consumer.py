@@ -15,7 +15,7 @@ class MemoryRequestedEvent(BaseModel):
     assistantMessage: str
 
 async def handle_memory(event: MemoryRequestedEvent):
-    # TODO (팀원 3): 이벤트 식별자로 중복을 처리하고 메모리 분할, 임베딩 생성 및 저장을 구현하세요.
+    # TODO (팀원 3): 이벤트 식별자로 중복을 처리하고 메모리와 문서 조각을 데이터베이스에 저장하세요.
     pass
 
 async def consume_memory():
