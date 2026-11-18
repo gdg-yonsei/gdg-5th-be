@@ -5,7 +5,8 @@
 ```mermaid
 flowchart LR
     UI[채팅 UI · Nginx :3000] -->|POST /api/chat| API[팀원 1 · Spring :8080]
-    LLM[팀원 2 · Go :50051 · 독립 mock]
+    API -.->|구현 과제: gRPC Generate| LLM[팀원 2 · Go :50051 · 에이전트 실행]
+    LLM -.->|구현 과제: search_memory 도구| RAG
     API -.->|구현 과제: 응답 완료 후 비동기 발행| MQ[팀원 4 · RabbitMQ · memory.add.requested.v1]
     MQ -.->|구현 과제: 이벤트 수신| RAG[팀원 3 · FastAPI + gRPC · 저장 mock]
     RAG -.->|팀원 3 구현 과제: 저장 및 검색| DB[PostgreSQL · 메모리 저장소]
@@ -54,7 +55,7 @@ Spring과 RAG는 서로 직접 호출하지 않습니다. RabbitMQ 인프라는 
 | --- | --- | --- |
 | 제공 | `frontend/` | 의존성 없는 HTML/CSS/JS 채팅 UI. SSE, 대화 목록·생성·조회·삭제 API 연동, 응답 중지, 복사, 코드 블록, 모바일 대응 |
 | 팀원 1 | `backend/src/main/java/com/example/chat/ChatController.java` | gateway gRPC 연결, SSE 응답 및 인증 |
-| 팀원 2 | `llm-gateway/main.go` | provider 및 RAG 연결, 실제 답변 스트리밍, 컨텍스트 조합, tool 실행 루프 |
+| 팀원 2 | `llm-gateway/main.go` | 모델 연동, `get_current_time`·`search_memory` 도구, 도구 실행 반복 흐름, 최종 답변 스트리밍 |
 | 팀원 3 | `rag-service/main.py` | `Retrieve` 검색, `StoreMemory` 및 `handle_memory()`의 메모리 분할·임베딩·저장, 대화별 메모리 격리 |
 | 팀원 4 | `MemoryEventPublisher.java`, `memory_consumer.py`, `rabbitmq/definitions.json` | RabbitMQ 설정, 응답 완료 후 비동기 이벤트 발행, 수신기 시작·종료, 수신 확인·재시도, 팀원 3의 저장 함수 연결 |
 | 팀원 5 | `ConversationController.java`, `ChatController.java`, `postgres/init.sql` | 채팅 내역 API의 DB 구현, 메시지 저장, 채팅 내역 테이블 설계 |
@@ -63,6 +64,67 @@ Spring과 RAG는 서로 직접 호출하지 않습니다. RabbitMQ 인프라는 
 | 팀원 4 | `MemoryRequestedEvent.java`, `memory_consumer.py` | Java와 Python 이벤트 자료형을 맞추고 팀원 1·3과 메시지 형식 합의 |
 
 UI에는 mock 모드가 표시됩니다. 실제 provider를 연결한 뒤 `frontend/index.html`의 mock 안내를 바꾸세요. 답변은 안전한 텍스트와 fenced code block으로 표시하며 임의 HTML을 실행하지 않습니다. 프론트는 채팅 내역을 API로 조회하며 브라우저 저장소를 사용하지 않습니다. 현재 백엔드는 저장하지 않는 mock이므로 새로고침하면 대화가 사라집니다. 한 요청은 최대 100개 메시지, 메시지당 16,000자이며 한도를 넘기면 새 대화를 시작합니다.
+
+## 팀원 2: LLM gateway와 도구 실행
+
+Go gateway는 모델 호출, 도구 실행, 도구 결과를 이용한 후속 모델 호출, 최종 답변 스트리밍을 담당합니다. 실습 도구는 `get_current_time`과 `search_memory` 두 가지입니다. 현재 코드는 `안녕하세요`만 반환하는 mock이며 아래 내용은 팀원 2가 구현할 명세입니다.
+
+### 도구: `get_current_time`
+
+- 목적: 현재 날짜·시각이 필요한 질문에 서버에서 확인한 시간을 제공합니다.
+- 입력: `{}`. 시간대는 `Asia/Seoul`로 고정합니다.
+- 실행: Go에서 현재 시각을 읽고 지정한 시간대로 변환합니다. 다른 서비스는 호출하지 않습니다.
+- 출력: `datetime`은 시차를 포함한 RFC 3339 문자열, `timezone`은 시간대 이름입니다.
+
+```json
+{
+  "datetime": "2026-11-18T16:00:00+09:00",
+  "timezone": "Asia/Seoul"
+}
+```
+
+위 시각은 출력 형식 예시이며, 실제 실행할 때마다 현재 시각을 반환해야 합니다. 예시 질문은 “지금 한국 시간으로 몇 시야?”입니다.
+
+### 도구: `search_memory`
+
+- 목적: 사용자의 이전 정보나 기억이 필요한 질문에서 관련 메모리를 검색합니다.
+- 입력: 내용이 있는 문자열 `query`.
+- 실행: gRPC `RagService.Retrieve`를 호출합니다. `query`는 도구 입력에서, `conversation_id`는 Spring이 전달한 `ChatRequest.conversation_id`에서 가져옵니다. 대화 식별자는 모델이 임의로 지정하는 도구 인자에 포함하지 않습니다.
+- 출력: `{"chunks":[...]}` 형태의 객체. 각 항목은 `id`, `content`, `score`를 가집니다. 검색 결과가 없으면 `{"chunks":[]}`를 반환합니다.
+
+입력 예시:
+
+```json
+{
+  "query": "사용자가 재학 중인 학교"
+}
+```
+
+현재 RAG mock을 연결했을 때의 출력 예시:
+
+```json
+{
+  "chunks": [
+    {
+      "id": "sample-memory-1",
+      "content": "유저는 현재 연세대학교에 재학중이다.",
+      "score": 1.0
+    }
+  ]
+}
+```
+
+예시 질문은 “내가 어느 학교 다닌다고 했지?”입니다. 실제 메모리 검색과 저장 구현은 팀원 3이 담당하고, gateway는 도구 호출과 결과 전달을 담당합니다.
+
+### 실행 흐름과 완료 조건
+
+1. Spring의 gRPC `Generate` 요청에서 대화 식별자와 메시지 이력을 받습니다.
+2. 모델에 대화 이력과 두 도구의 이름·설명·입력 인자 정의를 함께 전달합니다.
+3. 모델이 도구를 요청하면 이름과 인자를 검증하고 해당 도구를 실행합니다. 한 응답에서 여러 도구를 요청하면 각각 실행 결과를 준비합니다.
+4. 모델이 제공한 도구 호출 식별자에 맞춰 결과를 돌려주고 모델을 다시 호출합니다. 도구 요청이 계속되면 이 과정을 반복하되 최대 5회로 제한합니다.
+5. 최종 사용자 답변을 기존 `ChatChunk.delta`로 스트리밍하고, 완료 시 `done=true`를 한 번 보냅니다. 도구 호출 인자와 결과는 사용자 답변에 그대로 노출하지 않습니다.
+
+도구 오류는 모델이 이해할 수 있는 오류 결과로 전달하고, 실행 시간 제한과 요청 취소를 처리하세요. RAG 호출 실패를 검색 결과 없음으로 바꾸지 말고 구분하세요. 현재 `proto/chat.proto`의 `Generate`와 `Retrieve` 계약을 사용하며 도구 실행 과정은 gateway 내부에서 처리합니다.
 
 ## 팀원 5: DB 기반 채팅 내역
 
