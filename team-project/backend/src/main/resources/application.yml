@@ -1,6 +1,13 @@
 spring:
   application:
     name: chat-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:15432/chatbot}
+    username: ${SPRING_DATASOURCE_USERNAME:gdgoc}
+    password: ${SPRING_DATASOURCE_PASSWORD:gdgoc-dev-password}
+  sql:
+    init:
+      mode: never
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}

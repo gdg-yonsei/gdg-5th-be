@@ -52,16 +52,42 @@ Spring과 RAG는 서로 직접 호출하지 않습니다. RabbitMQ 인프라는 
 
 | 담당 | 폴더 / 시작점 | 확장할 내용 |
 | --- | --- | --- |
-| 제공 | `frontend/` | 의존성 없는 HTML/CSS/JS 채팅 UI. SSE, 대화 전환/삭제, localStorage 저장, 응답 중지, 복사, 코드 블록, 모바일 대응 |
-| 팀원 1 | `backend/src/main/java/com/example/chat/ChatController.java` | gateway gRPC 연결, SSE 응답, 인증 및 대화 관리 |
+| 제공 | `frontend/` | 의존성 없는 HTML/CSS/JS 채팅 UI. SSE, 대화 목록·생성·조회·삭제 API 연동, 응답 중지, 복사, 코드 블록, 모바일 대응 |
+| 팀원 1 | `backend/src/main/java/com/example/chat/ChatController.java` | gateway gRPC 연결, SSE 응답 및 인증 |
 | 팀원 2 | `llm-gateway/main.go` | provider 및 RAG 연결, 실제 답변 스트리밍, 컨텍스트 조합, tool 실행 루프 |
 | 팀원 3 | `rag-service/main.py` | `Retrieve` 검색, `StoreMemory` 및 `handle_memory()`의 메모리 분할·임베딩·저장, 대화별 메모리 격리 |
 | 팀원 4 | `MemoryEventPublisher.java`, `memory_consumer.py`, `rabbitmq/definitions.json` | RabbitMQ 설정, 응답 완료 후 비동기 이벤트 발행, 수신기 시작·종료, 수신 확인·재시도, 팀원 3의 저장 함수 연결 |
+| 팀원 5 | `ConversationController.java`, `ChatController.java`, `postgres/init.sql` | 채팅 내역 API의 DB 구현, 메시지 저장, 채팅 내역 테이블 설계 |
 | 팀원 3 | `postgres/init.sql` | PostgreSQL 테이블 설계, 이벤트 중복 처리, 메모리 저장·검색 |
 | 공동 | `proto/chat.proto` | gRPC 통신 계약. 변경 전에 서로 합의하고 관련 서비스 재빌드 |
 | 팀원 4 | `MemoryRequestedEvent.java`, `memory_consumer.py` | Java와 Python 이벤트 자료형을 맞추고 팀원 1·3과 메시지 형식 합의 |
 
-UI에는 mock 모드가 표시됩니다. 실제 provider를 연결한 뒤 `frontend/index.html`의 mock 안내를 바꾸세요. 답변은 안전한 텍스트와 fenced code block으로 표시하며 임의 HTML을 실행하지 않습니다. 대화는 현재 브라우저에 저장됩니다. 전체 대화가 서버에 영구 보관되는 구조는 아닙니다. 한 요청은 최대 100개 메시지, 메시지당 16,000자이며 한도를 넘기면 새 대화를 시작합니다.
+UI에는 mock 모드가 표시됩니다. 실제 provider를 연결한 뒤 `frontend/index.html`의 mock 안내를 바꾸세요. 답변은 안전한 텍스트와 fenced code block으로 표시하며 임의 HTML을 실행하지 않습니다. 프론트는 채팅 내역을 API로 조회하며 브라우저 저장소를 사용하지 않습니다. 현재 백엔드는 저장하지 않는 mock이므로 새로고침하면 대화가 사라집니다. 한 요청은 최대 100개 메시지, 메시지당 16,000자이며 한도를 넘기면 새 대화를 시작합니다.
+
+## 팀원 5: DB 기반 채팅 내역
+
+프론트의 채팅 내역 API 호출은 구현되어 있습니다. 초기 목록 조회, 대화 생성, 대화 선택 시 메시지 조회, 삭제를 서버에 요청합니다. 브라우저 저장소는 사용하지 않습니다. 목록 로딩·조회 실패 재시도·생성/삭제 실패·응답 중지도 처리합니다.
+
+| 동작 | API | 요청 / 응답 |
+| --- | --- | --- |
+| 목록 조회 | `GET /api/conversations` | 대화 배열. 각 항목은 `id`, `title`, `createdAt`, `updatedAt` |
+| 첫 메시지 전 대화 생성 | `POST /api/conversations` | 요청 `{"title":"첫 질문"}`, 응답 201 및 생성된 대화 객체 |
+| 대화 선택 | `GET /api/conversations/{id}/messages` | 시간순 메시지 배열. 각 항목은 `id`, `role`, `content`, `status`, `createdAt` |
+| 대화 삭제 | `DELETE /api/conversations/{id}` | 성공 응답 204 |
+| 사용자 메시지와 답변 저장 | `POST /api/chat` | 생성된 `conversationId`와 대화 이력 전달. 백엔드가 이번 사용자 메시지와 생성한 답변을 저장 |
+
+현재 `ConversationController.java`는 **DB를 사용하지 않는 mock**입니다. 목록과 메시지 조회는 빈 배열, 생성은 임시 식별자가 담긴 객체, 삭제는 204를 반환합니다. 따라서 프론트에서 새 대화를 진행할 수 있지만 새로고침 또는 메시지 재조회 시 내역은 복원되지 않습니다. 실제 저장과 복원은 팀원 5가 구현합니다.
+
+팀원 5가 구현할 내용:
+
+- 대화 및 원문 메시지를 저장할 테이블 설계. 팀원 3의 검색용 메모리 테이블과 구분합니다.
+- `ConversationController.java`의 목록·생성·메시지 조회·삭제를 DB에 연결.
+- 목록은 최근 갱신 순, 메시지는 대화 내 시간순으로 반환. 없는 대화는 404 처리.
+- `ChatController.java`에서 이번 사용자 메시지와 완성된 답변 저장 및 최근 갱신 시각 반영.
+- 요청에 전체 이력이 포함되므로 과거 메시지의 중복 저장 방지. 프론트는 별도 메시지 저장 API를 중복 호출하지 않습니다.
+- 실패·중단 응답의 저장 정책과 메시지 식별자를 설계. `status`는 `done`, `stopped`, `error` 중 하나로 반환합니다.
+
+프론트와 백엔드의 API 경로·필드 계약을 유지하면 프론트 수정 없이 DB 구현을 연결할 수 있습니다.
 
 ## HTTP / SSE 계약
 
@@ -151,6 +177,15 @@ docker compose exec rabbitmq rabbitmqctl list_bindings
 `.env`의 `RABBITMQ_PORT`, `RABBITMQ_MANAGEMENT_PORT`로 외부 포트를 바꿀 수 있습니다. 큐 이름·exchange·routing key를 바꾸려면 `rabbitmq/definitions.json`과 Spring `application.yml`의 `app.memory` 설정을 함께 수정하세요. 브로커 데이터는 `rabbitmq-data` 볼륨에 유지됩니다. 메시지를 재시작 후에도 보존하려면 발행 시 persistent 메시지 설정도 구현하세요.
 
 ## PostgreSQL 메모리 저장소
+
+Spring backend는 JDBC 데이터 소스와 PostgreSQL 드라이버로 연결 설정까지 제공합니다. Compose가 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 전달하며, PostgreSQL 준비 후 backend가 시작됩니다. 기존 `.env`의 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`를 공유합니다.
+
+```sh
+# PostgreSQL과 backend 실행 (데이터베이스도 자동 시작)
+docker compose up -d --build backend
+```
+
+backend의 채팅 내역 조회·저장과 테이블 설계는 팀원 5의 TODO입니다. 테이블 자동 생성 기능은 추가하지 않았습니다. `/actuator/health`는 데이터베이스 연결 상태를 함께 확인합니다.
 
 PostgreSQL 17과 초기 테이블을 제공합니다. 현재 RAG API는 샘플 응답을 유지하며 데이터베이스 연결·저장·조회는 팀원 3이 구현합니다. RAG는 데이터베이스가 없어도 mock으로 실행할 수 있습니다.
 
