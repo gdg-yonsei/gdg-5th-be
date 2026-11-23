@@ -1,12 +1,46 @@
 package com.example.chat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MemoryEventPublisher {
+    private static final Logger log = LoggerFactory.getLogger(MemoryEventPublisher.class);
+    private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
+    private final String exchange;
+    private final String routingKey;
+
+    public MemoryEventPublisher(RabbitTemplate rabbitTemplate, ObjectMapper objectMapper,
+                                @Value("${app.memory.exchange}") String exchange,
+                                @Value("${app.memory.routing-key}") String routingKey) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
+        this.exchange = exchange;
+        this.routingKey = routingKey;
+    }
+
+    @Async
     public void publish(MemoryRequestedEvent event) {
-        // TODO (팀원 4): 래빗엠큐 메시지 전송 도구로 메모리 추가 이벤트를 발행하세요.
-        // 교환기와 라우팅 키는 애플리케이션 설정을, 메시지 본문은 메모리 추가 이벤트 자료형을 참고하세요.
-        // 응답 완료 후 비동기로 호출하고 발행 실패 처리도 구현하세요.
+        try {
+            MessageProperties properties = new MessageProperties();
+            properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            properties.setContentEncoding("UTF-8");
+            properties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+            properties.setMessageId(event.eventId());
+            rabbitTemplate.send(exchange, routingKey,
+                new Message(objectMapper.writeValueAsBytes(event), properties));
+        } catch (Exception e) {
+            // 발행 실패는 이미 완료된 채팅 응답에 영향을 주지 않습니다.
+            log.error("Failed to publish memory event {}", event.eventId(), e);
+        }
     }
 }

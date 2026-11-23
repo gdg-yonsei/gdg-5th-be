@@ -1,9 +1,16 @@
 """팀원 4: 래빗엠큐 이벤트를 수신하고 팀원 3의 메모리 저장 기능을 호출하세요."""
+import asyncio
+import logging
+import os
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+import aio_pika
+from pydantic import BaseModel, Field, ValidationError
+
+logger = logging.getLogger("uvicorn.error")
+QUEUE_NAME = "memory.add.requested.v1"
 
 class MemoryRequestedEvent(BaseModel):
     schemaVersion: Literal[1]
@@ -19,7 +26,52 @@ async def handle_memory(event: MemoryRequestedEvent):
     pass
 
 async def consume_memory():
-    # TODO (팀원 4): 비동기 메시징 라이브러리로 큐를 구독하고 메시지 본문을 이벤트 자료형으로 변환하세요.
-    # TODO (팀원 4): 메모리 저장 함수 호출, 수신 확인과 거부, 재시도 및 종료 처리를 구현하세요.
-    # TODO (팀원 4): 애플리케이션 수명 주기에 메시지 수신기의 시작과 종료를 연결하세요.
-    pass
+    while True:
+        try:
+            connection = await aio_pika.connect_robust(
+                host=os.getenv("RABBITMQ_HOST", "localhost"),
+                port=int(os.getenv("RABBITMQ_PORT", "5672")),
+                login=os.getenv("RABBITMQ_USERNAME", "gdgoc"),
+                password=os.getenv("RABBITMQ_PASSWORD", "gdgoc-dev-password"),
+                virtualhost="/",
+                timeout=5,
+            )
+            async with connection:
+                channel = await connection.channel()
+                await channel.set_qos(prefetch_count=1)
+                # 큐는 rabbitmq-init이 생성합니다. 초기화 전이라면 아래에서 재연결합니다.
+                queue = await channel.get_queue(QUEUE_NAME)
+                logger.info("Consuming memory events from %s", QUEUE_NAME)
+                async with queue.iterator() as messages:
+                    async for message in messages:
+                        await process_message(message)
+        except asyncio.CancelledError:
+            # 연결 종료 시 ACK하지 않은 메시지는 브로커가 다시 큐에 넣습니다.
+            raise
+        except Exception:
+            logger.exception("Memory consumer disconnected; retrying in 5 seconds")
+            await asyncio.sleep(5)
+
+
+async def process_message(message: aio_pika.IncomingMessage):
+    try:
+        event = MemoryRequestedEvent.model_validate_json(message.body)
+    except ValidationError:
+        logger.exception("Rejecting invalid memory event")
+        await message.reject(requeue=False)
+        return
+
+    logger.info("Received memory event: %s", event.model_dump_json())
+
+    for attempt in range(1, 4):
+        try:
+            await handle_memory(event)
+        except Exception:
+            logger.exception("Memory event %s failed (attempt %s/3)", event.eventId, attempt)
+            if attempt == 3:
+                await message.nack(requeue=False)
+                return
+            await asyncio.sleep(attempt)
+        else:
+            await message.ack()
+            return
