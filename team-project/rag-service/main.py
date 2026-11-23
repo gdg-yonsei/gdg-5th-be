@@ -1,5 +1,7 @@
 """팀원 3: 샘플 응답을 실제 메모리 검색과 저장으로 교체하세요."""
 from contextlib import asynccontextmanager
+from contextlib import suppress
+import asyncio
 import logging
 
 import grpc
@@ -8,6 +10,7 @@ from pydantic import BaseModel, Field
 
 import chat_pb2 as pb
 import chat_pb2_grpc as rpc
+from memory_consumer import consume_memory
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -35,10 +38,13 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Could not bind gRPC port 50052")
     await server.start()
     app.state.grpc_server = server
-    # TODO (팀원 4): 애플리케이션 수명 주기에 래빗엠큐 메시지 수신기의 시작과 종료를 연결하세요.
+    consumer_task = asyncio.create_task(consume_memory())
     try:
         yield
     finally:
+        consumer_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await consumer_task
         await server.stop(grace=3)
 
 app = FastAPI(title="RAG Service · Mock", version="0.1.0", lifespan=lifespan)
