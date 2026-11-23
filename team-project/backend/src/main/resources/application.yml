@@ -27,6 +27,8 @@ management:
       exposure:
         include: health
 app:
+  gateway:
+    target: ${LLM_GATEWAY_TARGET:localhost:50051}
   memory:
     exchange: memory
     queue: memory.add.requested.v1
