@@ -5,8 +5,9 @@ WORKDIR /workspace/llm-gateway
 COPY llm-gateway/ ./
 COPY proto /workspace/proto
 RUN mkdir -p gen && protoc -I /workspace/proto --go_out=gen --go_opt=paths=source_relative --go-grpc_out=gen --go-grpc_opt=paths=source_relative /workspace/proto/chat.proto
-RUN go mod tidy && CGO_ENABLED=0 go build -o /gateway .
+RUN go mod tidy && CGO_ENABLED=0 go build -o /gateway . && CGO_ENABLED=0 go build -o /mockllm ./cmd/mockllm
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /gateway /gateway
+COPY --from=build /mockllm /mockllm
 EXPOSE 50051
 ENTRYPOINT ["/gateway"]
