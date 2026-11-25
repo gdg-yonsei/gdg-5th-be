@@ -39,6 +39,12 @@ services:
     build:
       context: .
       dockerfile: llm-gateway/Dockerfile
+    environment:
+      # 기본은 mock-llm (키 없이 테스트). 진짜 모델은 .env 에 LLM_BASE_URL·LLM_API_KEY·LLM_MODEL 설정
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://mock-llm:8090/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      RAG_ADDR: rag-service:50052
     ports:
       - "${GATEWAY_PORT:-50051}:50051"
     healthcheck:
@@ -46,6 +52,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  # 가짜 LLM (OpenRouter 흉내). gateway 와 같은 이미지에서 /mockllm 만 실행한다.
+  mock-llm:
+    build:
+      context: .
+      dockerfile: llm-gateway/Dockerfile
+    entrypoint: ["/mockllm"]
     restart: unless-stopped
 
   rag-service:
