@@ -10,6 +10,7 @@ import io.grpc.stub.StreamObserver;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class LlmGatewayClient {
@@ -21,12 +22,12 @@ public class LlmGatewayClient {
         stub = LlmGatewayGrpc.newStub(channel);
     }
 
-    public void generate(ChatController.Request request, StreamObserver<ChatChunk> observer) {
+    public void generate(ChatController.Request request, StreamObserver<ChatChunk> observer, long timeoutMillis) {
         ChatRequest.Builder body = ChatRequest.newBuilder().setConversationId(request.conversationId());
         for (ChatController.Message message : request.messages()) {
             body.addMessages(ChatMessage.newBuilder().setRole(message.role()).setContent(message.content()));
         }
-        stub.generate(body.build(), observer);
+        stub.withDeadlineAfter(timeoutMillis, TimeUnit.MILLISECONDS).generate(body.build(), observer);
     }
 
     @PreDestroy

@@ -27,6 +27,9 @@ management:
       exposure:
         include: health
 app:
+  chat:
+    timeout-ms: ${CHAT_TIMEOUT_MS:60000}
+    heartbeat-ms: ${CHAT_HEARTBEAT_MS:15000}
   gateway:
     target: ${LLM_GATEWAY_TARGET:localhost:50051}
   memory:

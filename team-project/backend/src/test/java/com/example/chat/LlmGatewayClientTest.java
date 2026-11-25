@@ -74,7 +74,7 @@ class LlmGatewayClientTest {
             @Override public void onNext(ChatChunk chunk) { chunks.add(chunk); }
             @Override public void onError(Throwable error) { result.completeExceptionally(error); }
             @Override public void onCompleted() { result.complete(chunks); }
-        });
+        }, 10000);
         return result.get(10, TimeUnit.SECONDS);
     }
 }

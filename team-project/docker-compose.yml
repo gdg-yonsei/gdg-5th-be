@@ -16,6 +16,8 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       LLM_GATEWAY_TARGET: llm-gateway:50051
+      CHAT_TIMEOUT_MS: ${CHAT_TIMEOUT_MS:-60000}
+      CHAT_HEARTBEAT_MS: ${CHAT_HEARTBEAT_MS:-15000}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-chatbot}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-gdgoc}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-gdgoc-dev-password}
